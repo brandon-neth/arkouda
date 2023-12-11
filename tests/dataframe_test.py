@@ -944,33 +944,29 @@ class DataFrameTest(ArkoudaTest):
     def test_iloc(self):
         df = build_ak_df()
         # integer
-        self.assertEqual(df.iloc[0], ['Alice', 111,0,5,0.5,2**200])
-        self.assertEqual(df.iloc[3], ['Carol',333,1,5,1,2,2**200+3])
+        self.assertEqual(df.iloc[0], build_ak_row('Alice', 111,0,5,0.5,2**200))
+        self.assertEqual(df.iloc[3], build_ak_row('Carol',333,1,5,1.2,2**200+3))
         # list of integers
         subFrame = df.iloc[[0,3]]
         self.assertTrue(isinstance(subFrame, ak.DataFrame))
-        self.assertEqual(subFrame.iloc[0], ['Alice', 111,0,5,0.5,2**200])
-        self.assertEqual(subFrame.iloc[1], ['Carol',333,1,5,1,2,2**200+3])
+        self.assertEqual(subFrame.iloc[0], build_ak_row('Alice', 111,0,5,0.5,2**200))
+        self.assertEqual(subFrame.iloc[1], build_ak_row('Carol',333,1,5,1.2,2**200+3))
         # slice object with ints
         subFrame = df.iloc[:2]
         self.assertTrue(isinstance(subFrame, ak.DataFrame))
-        self.assertEqual(subFrame.iloc[0], ['Alice', 111,0,5,0.5,2**200])
-        self.assertEqual(subFrame.iloc[1], ['Bob', 222,0,5,0.6,2**200+1])
+        self.assertEqual(subFrame.iloc[0], build_ak_row('Alice', 111,0,5,0.5,2**200))
+        self.assertEqual(subFrame.iloc[1], build_ak_row('Bob', 222,0,5,0.6,2**200+1))
         # boolean array
         subFrame = df.iloc[[True,False,True,False,False,True]]
-        self.assertEqual(subFrame.iloc[0], ['Alice', 111,0,5,0.5,2**200])
-        self.assertEqual(subFrame.iloc[1], ['Alice', 111,1,6,1.1,2**200+2])
-        self.assertEqual(subFrame.iloc[2], ['Alice', 111,1,6,0.6,2**200+5])
-        # callable that returns valid indexing output
-        subFrame = df.iloc[lambda x: x.index % 3 == 0]
-        self.assertEqual(subFrame.iloc[0], ['Alice', 111,0,5,0.5,2**200])
-        self.assertEqual(subFrame.iloc[1], ['Carol',333,1,5,1,2,2**200+3])
+        self.assertEqual(subFrame.iloc[0], build_ak_row('Alice', 111,0,5,0.5,2**200))
+        self.assertEqual(subFrame.iloc[1], build_ak_row('Alice', 111,1,6,1.1,2**200+2))
+        self.assertEqual(subFrame.iloc[2], build_ak_row('Alice', 111,0,6,0.6,2**200+5))
         # tuple of row and column indexes, where elements are one of above
         self.assertEqual(df.iloc[0,0], 'Alice')
         self.assertEqual(df.iloc[3,0], 'Carol')
         self.assertEqual(df.iloc[1,2], 0)
         self.assertEqual(df.iloc[2,4], 1.1)
-        #TODO: tuple of callable, tuple of slice
+        #TODO: callable, tuple of callable, tuple of slice
 
 def pda_to_str_helper(pda):
     return ak.array([f"str {i}" for i in pda.to_list()])

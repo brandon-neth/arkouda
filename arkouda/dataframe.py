@@ -936,7 +936,7 @@ class DataFrame(UserDict):
 
     @property
     def iat(self):
-        return _AtIndexer("at", self)
+        return _iAtIndexer("iat", self)
         return None
 
     def _set_index(self, value):

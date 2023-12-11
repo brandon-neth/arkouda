@@ -57,7 +57,9 @@ class _AtIndexer(DFIndexer):
 class _iAtIndexer(DFIndexer):
 
   def __getitem__(self, key):
-    return None
+    if not isinstance(key, tuple):
+      raise ValueError(".iat indexing requires integer arguments for row and column.")
+    return self.obj.iloc[key]
   
 class _LocIndexer(DFIndexer):
 
@@ -93,6 +95,9 @@ class _iLocIndexer(DFIndexer):
   def __getitem__(self, key):
     print("iloc.__getitem__ ", key)
     print("type of index:", type(key))
+    if isinstance(key, tuple):
+      if len(key) == 2:
+        return self.obj[key[0]][self.obj.columns[key[1]]]
     if isinstance(key, list):
       if len(key) == 0:
         return self.obj[key]
@@ -100,7 +105,7 @@ class _iLocIndexer(DFIndexer):
       key_types = {resolve_scalar_dtype(k) for k in key}
       if len(key_types) != 1:
         raise ValueError(".iloc argument must have single data type")
-      if resolve_scalar_dtype(key[0]) != akint64:
-        raise ValueError(".iloc argument must be list of integers")
+      if resolve_scalar_dtype(key[0]) != akint64 and resolve_scalar_dtype(key[0]) != akbool:
+        raise ValueError(".iloc argument must be list of integers or booleans")
       return self.obj[array(key)]
     return self.obj[key]
