@@ -33,6 +33,7 @@ from arkouda.series import Series
 from arkouda.sorting import argsort, coargsort
 from arkouda.strings import Strings
 from arkouda.timeclass import Datetime, Timedelta
+from arkouda.dataframe_indexing import _LocIndexer, _iLocIndexer, _AtIndexer, _iAtIndexer
 
 # This is necessary for displaying DataFrames with BitVector columns,
 # because pandas _html_repr automatically truncates the number of displayed bits
@@ -917,6 +918,26 @@ class DataFrame(UserDict):
     @property
     def index(self):
         return self._index
+
+    @property
+    def loc(self):
+        return _LocIndexer("loc", self)
+        return None
+
+    @property
+    def iloc(self):
+        return _iLocIndexer("iloc", self)
+        return None
+
+    @property
+    def at(self):
+        return _AtIndexer("at", self)
+        return None
+
+    @property
+    def iat(self):
+        return _AtIndexer("at", self)
+        return None
 
     def _set_index(self, value):
         if isinstance(value, Index) or value is None:
