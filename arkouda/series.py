@@ -12,7 +12,7 @@ import arkouda.dataframe
 from arkouda.accessor import CachedAccessor, DatetimeAccessor, StringAccessor
 from arkouda.alignment import lookup
 from arkouda.categorical import Categorical
-from arkouda.dtypes import float64, int64
+from arkouda.dtypes import float64, int64, SeriesDTypes, numpy_scalars, float_scalars, all_scalars, dtype
 from arkouda.groupbyclass import GroupBy, groupable_element_type
 from arkouda.index import Index, MultiIndex
 from arkouda.numeric import cast as akcast
@@ -140,6 +140,7 @@ class Series:
         if self.index.size != self.values.size:
             raise ValueError("Index size does not match data size")
         self.size = self.index.size
+        self.index_type = type(index[0])
 
     def __len__(self):
         return self.values.size
@@ -169,10 +170,34 @@ class Series:
         )
 
     def __getitem__(self, key):
+        if isinstance(key, all_scalars):
+            if dtype(type(key)) != dtype(self.index_type):
+                raise TypeError("Mismatch between Series index type and argument type", type(key), self.index_type)
+            indices = self.index == key
+            return Series(index=self.index[indices], data=self.values[indices])
+        
+        if isinstance(key, (list, tuple)):
+            key = array(key)
         if isinstance(key, Series):
             # @TODO align the series indexes
             key = key.values
-        return Series((self.index[key], self.values[key]))
+        
+        if isinstance(key, Strings):
+            if dtype(self.index_type) != dtype(str):
+                raise TypeError("Mismatch between Series index type and argument type", type(key), self.index_type)
+            indices = in1d(self.index.values, key)
+            return Series(index=self.index[indices], data=self.values[indices])
+        if isinstance(key, pdarray):
+            #always allow boolean lists, which are to be treated as masks
+            if key.dtype == dtype(bool):
+                return Series(index=self.index[key],data=self.values[key])
+            if key.dtype != dtype(self.index_type):
+                raise TypeError("Mismatch between Series index type and argument type", type(key), self.index_type)
+            indices = in1d(self.index.values, key)
+            return Series(index=self.index[indices], data=self.values[indices])
+        raise TypeError("Series [] only supports indexing by scalars, lists of scalars, and arrays of scalars.")
+    
+            
 
     dt = CachedAccessor("dt", DatetimeAccessor)
     str_acc = CachedAccessor("str", StringAccessor)

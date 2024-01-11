@@ -223,3 +223,103 @@ class SeriesTest(ArkoudaTest):
         g = df.groupby(["a", "b"])
         series = ak.Series(data=g.sum("c")["c"], index=g.sum("c").index)
         g.broadcast(series)
+
+    def test_getitem_scalars(self):
+        ints = ak.array([0,1,3,7,3])
+        floats = ak.array([0.0,1.5,0.5,1.5,-1.0])
+        strings = ak.array(['A','C','DE','C','Z'])
+
+        s1 = ak.Series(index=strings, data=floats)
+        with self.assertRaises(TypeError):
+            s1[1.0]
+        with self.assertRaises(TypeError):
+            s1[1]
+        s1_a1 = s1['A']
+        self.assertTrue(isinstance(s1_a1, ak.Series))
+        self.assertListEqual(s1_a1.index.to_list(), ['A'])
+        self.assertListEqual(s1_a1.values.to_list(), [0.0])
+        s1_a2 = s1['C']
+        self.assertTrue(isinstance(s1_a2, ak.Series))
+        self.assertListEqual(s1_a2.index.to_list(), ['C','C'])
+        self.assertListEqual(s1_a2.values.to_list(), [1.5,1.5])
+
+        s2 = ak.Series(index=ints,data=strings)
+        with self.assertRaises(TypeError):
+            s2[1.0]
+        with self.assertRaises(TypeError):
+            s2['A']
+        s2_a1 = s2[7]
+        self.assertTrue(isinstance(s2_a1, ak.Series))
+        self.assertListEqual(s2_a1.index.to_list(), [7])
+        self.assertListEqual(s2_a1.values.to_list(), ['C'])
+
+        s2_a2 = s2[3]
+        self.assertTrue(isinstance(s2_a2, ak.Series))
+        self.assertListEqual(s2_a2.index.to_list(), [3,3])
+        self.assertListEqual(s2_a2.values.to_list(), ['DE', 'Z'])
+
+        s3 = ak.Series(index=floats, data=ints)
+        with self.assertRaises(TypeError):
+            s3[1]
+        with self.assertRaises(TypeError):
+            s3['A']
+        s3_a1 = s3[0.0]
+        self.assertTrue(isinstance(s3_a1, ak.Series))
+        self.assertListEqual(s3_a1.index.to_list(), [0.0])
+        self.assertListEqual(s3_a1.values.to_list(), [0])
+
+        s3_a2 = s3[1.5]
+        self.assertTrue(isinstance(s3_a2, ak.Series))
+        self.assertListEqual(s3_a2.index.to_list(), [1.5,1.5])
+        self.assertListEqual(s3_a2.values.to_list(), [1,7])
+
+    def test_getitem_vectors(self):
+        ints = ak.array([0,1,3,7,3])
+        floats = ak.array([0.0,1.5,0.5,1.5,-1.0])
+        strings = ak.array(['A','C','DE','C','Z'])
+
+        s1 = ak.Series(index=strings, data=floats)
+        with self.assertRaises(TypeError):
+            s1[[1.0,2.0]]
+        with self.assertRaises(TypeError):
+            s1[[1,2]]
+        with self.assertRaises(TypeError):
+            s1[ak.array([1.0,2.0])]
+        with self.assertRaises(TypeError):
+            s1[ak.array([1,2])]
+        for vector in [['A','Z'], ak.array(['A','Z']), ('A','Z')]:
+            s1_a1 = s1[vector]
+            self.assertTrue(isinstance(s1_a1, ak.Series))
+            self.assertListEqual(s1_a1.index.to_list(), ['A','Z'])
+            self.assertListEqual(s1_a1.values.to_list(), [0.0,-1.0])
+
+        s1_a2 = s1['C','DE']
+        self.assertTrue(isinstance(s1_a2, ak.Series))
+        self.assertListEqual(s1_a2.index.to_list(), ['C','DE','C'])
+        self.assertListEqual(s1_a2.values.to_list(), [1.5,0.5,1.5])
+
+        s1_a3 = s1[[True,False,True,False,False]]
+        self.assertTrue(isinstance(s1_a3, ak.Series))
+        self.assertListEqual(s1_a3.index.to_list(), ['A','DE'])
+        self.assertListEqual(s1_a3.values.to_list(), [0.0,0.5])
+
+        s2 = ak.Series(index=floats, data=ints)
+        with self.assertRaises(TypeError):
+            s2[['A']]
+        with self.assertRaises(TypeError):
+            s2[[1,2]]
+        with self.assertRaises(TypeError):
+            s2[ak.array(['A','B'])]
+        with self.assertRaises(TypeError):
+            s2[ak.array([1,2])]
+        for vector in [[0.5,0.0], ak.array([0.5,0.0]), (0.5,0.0)]:
+            s2_a1 = s2[vector]
+            self.assertTrue(isinstance(s2_a1, ak.Series))
+            self.assertListEqual(s2_a1.index.to_list(), [0.0,0.5])
+            self.assertListEqual(s2_a1.values.to_list(), [0,3])
+
+        s2_a2 = s2[1.5,1.2]
+        self.assertTrue(isinstance(s2_a2, ak.Series))
+        self.assertListEqual(s2_a2.index.to_list(), [1.5,1.5])
+        self.assertListEqual(s2_a2.values.to_list(), [1,7])
+
