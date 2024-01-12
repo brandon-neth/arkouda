@@ -323,3 +323,79 @@ class SeriesTest(ArkoudaTest):
         self.assertListEqual(s2_a2.index.to_list(), [1.5,1.5])
         self.assertListEqual(s2_a2.values.to_list(), [1,7])
 
+    def test_setitem_scalars(self):
+        ints = [0,1,3,7,3]
+        floats = [0.0,1.5,0.5,1.5,-1.0]
+        strings = ['A','C','DE','C','Z']
+        
+        s1 = ak.Series(index=ak.array(strings), data=ak.array(floats))
+        with self.assertRaises(TypeError):
+            s1[1.0] = 1.0
+        with self.assertRaises(TypeError):
+            s1[1] = 1.0
+        with self.assertRaises(TypeError):
+            s1['A'] = 1
+        with self.assertRaises(TypeError):
+            s1['A'] = 'C'
+        
+        s1['A'] = 0.2
+        self.assertListEqual(s1.values.to_list(), [0.2,1.5,0.5,1.5,-1.0])
+        s1['C'] = 1.2
+        self.assertListEqual(s1.values.to_list(), [0.2,1.2,0.5,1.2,-1.0])
+        s1['X'] = 0.0
+        self.assertListEqual(s1.index.to_list(), ['A','C','DE','C','Z', 'X'])
+        self.assertListEqual(s1.values.to_list(), [0.2,1.2,0.5,1.2,-1.0,0.0])
+        s1['C'] = [0.3, 0.4]
+        self.assertListEqual(s1.values.to_list(), [0.2,0.3,0.5,0.4,-1.0,0.0])
+        with self.assertRaises(ValueError):
+            s1['C'] = [0.4, 0.3, 0.2]
+        
+        #cannot assign to Strings
+        s2 = ak.Series(index=ak.array(ints), data=ak.array(strings))
+        with self.assertRaises(TypeError):
+            s2[1.0] = 'D'
+        with self.assertRaises(TypeError):
+            s2['C'] = 'E'
+        with self.assertRaises(TypeError):
+            s2[0] = 1.0
+        with self.assertRaises(TypeError):
+            s2[0] = 1
+        with self.assertRaises(TypeError):
+            s2[7] = 'L'
+        with self.assertRaises(TypeError):
+            print("Start")
+            s2[3] = ['X1', 'X2']
+            print(s2)
+
+       
+        s3 = ak.Series(index=ak.array(floats), data=ak.array(ints)) 
+        self.assertListEqual(s3.values.to_list(), [0,1,3,7,3])
+        self.assertListEqual(s3.index.to_list(), [0.0,1.5,0.5,1.5,-1.0])
+        s3[0.0] = 2
+        self.assertListEqual(s3.values.to_list(), [2,1,3,7,3])
+        s3[1.5] = 8
+        self.assertListEqual(s3.values.to_list(),  [2,8,3,8,3])
+        s3[2.0] = 9
+        self.assertListEqual(s3.index.to_list(), [0.0,1.5,0.5,1.5,-1.0,2.0])
+        self.assertListEqual(s3.values.to_list(), [2,8,3,8,3,9])
+        s3[1.5] = [4,5]
+        self.assertListEqual(s3.values.to_list(), [2,4,3,5,3,9])
+        s3[1.5] = ak.array([6,7])
+        self.assertListEqual(s3.values.to_list(), [2,6,3,7,3,9])
+        s3[1.5] = [8]
+        self.assertListEqual(s3.values.to_list(), [2,8,3,8,3,9])
+        with self.assertRaises(ValueError):
+            s3[1.5] = [9,10,11]
+        with self.assertRaises(ValueError):
+            s3[1.5] = ak.array([0,1,2])
+        with self.assertRaises(ValueError):
+            s3[1.5] = ak.array([0])
+
+
+
+    def test_setitem_vector(self):
+        ints = ak.array([0,1,3,7,3])
+        floats = ak.array([0.0,1.5,0.5,1.5,-1.0])
+        strings = ak.array(['A','C','DE','C','Z'])
+
+        pass

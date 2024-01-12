@@ -17,7 +17,7 @@ from arkouda.groupbyclass import GroupBy, groupable_element_type
 from arkouda.index import Index, MultiIndex
 from arkouda.numeric import cast as akcast
 from arkouda.numeric import value_counts
-from arkouda.pdarrayclass import argmaxk, create_pdarray, pdarray, RegistrationError
+from arkouda.pdarrayclass import argmaxk, create_pdarray, pdarray, RegistrationError, any
 from arkouda.pdarraycreation import arange, array, zeros
 from arkouda.pdarraysetops import argsort, concatenate, in1d
 from arkouda.strings import Strings
@@ -140,7 +140,6 @@ class Series:
         if self.index.size != self.values.size:
             raise ValueError("Index size does not match data size")
         self.size = self.index.size
-        self.index_type = type(index[0])
 
     def __len__(self):
         return self.values.size
@@ -171,7 +170,7 @@ class Series:
 
     def __getitem__(self, key):
         if isinstance(key, all_scalars):
-            if dtype(type(key)) != dtype(self.index_type):
+            if dtype(type(key)) != self.index.dtype:
                 raise TypeError("Mismatch between Series index type and argument type", type(key), self.index_type)
             indices = self.index == key
             return Series(index=self.index[indices], data=self.values[indices])
@@ -183,7 +182,7 @@ class Series:
             key = key.values
         
         if isinstance(key, Strings):
-            if dtype(self.index_type) != dtype(str):
+            if self.index.dtype != dtype(str):
                 raise TypeError("Mismatch between Series index type and argument type", type(key), self.index_type)
             indices = in1d(self.index.values, key)
             return Series(index=self.index[indices], data=self.values[indices])
@@ -191,12 +190,60 @@ class Series:
             #always allow boolean lists, which are to be treated as masks
             if key.dtype == dtype(bool):
                 return Series(index=self.index[key],data=self.values[key])
-            if key.dtype != dtype(self.index_type):
+            if key.dtype != self.index.dtype:
                 raise TypeError("Mismatch between Series index type and argument type", type(key), self.index_type)
             indices = in1d(self.index.values, key)
             return Series(index=self.index[indices], data=self.values[indices])
         raise TypeError("Series [] only supports indexing by scalars, lists of scalars, and arrays of scalars.")
     
+    def __setitem__(self, key, val):
+
+        if isinstance(key, all_scalars):
+            if dtype(type(key)) != self.index.dtype:
+                raise TypeError("Unexpected key type. Received {} but expected {}".format(dtype(type(key)), self.index.dtype))
+            if isinstance(val, all_scalars):
+                if dtype(type(val)) != self.values.dtype:
+                    raise TypeError("Unexpected value type. Received {} but expected {}".format(dtype(type(val)), self.values.dtype))
+                indices = self.index == key
+                if any(indices):
+                    self.values[indices] = val
+                else:
+                    #insert new row
+                    new_index_values = concatenate([self.index.values, array([key])])
+                    self.index = Index.factory(new_index_values)
+                    self.values = concatenate([self.values, array([val])])
+                return
+            
+            if isinstance(val, (list, tuple)):
+                if len(val) == 1:
+                    self[key] = val[0]
+                    return
+                val = array(val)
+                
+            if isinstance(val, pdarray):
+                print("assigning pdarray to entries")
+                if val.dtype != self.values.dtype:
+                    raise TypeError("Unexpected value type. Received {} but expected {}".format(dtype(type(val)), self.values.dtype))
+                if val.dtype == dtype(str):
+                    raise TypeError("Cannot modify Strings.")
+                tf, counts = GroupBy(self.index == key).count()
+                if counts[1] != len(val):
+                    raise ValueError("cannot set using a list-like indexer with a different length from the value")
+                
+                indices = self.index == key
+                self.values[indices] = val
+                return
+            
+            raise TypeError("cannot set with unsupported value type: {}".format(type(val)))
+
+        if isinstance(key, (list, tuple)):
+            key = array(key)
+        if isinstance(key, Series):
+            # @TODO align the series indexes
+            key = key.values
+ 
+
+            
             
 
     dt = CachedAccessor("dt", DatetimeAccessor)
