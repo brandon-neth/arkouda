@@ -18,7 +18,7 @@ from arkouda.index import Index, MultiIndex
 from arkouda.numeric import cast as akcast
 from arkouda.numeric import value_counts
 from arkouda.pdarrayclass import argmaxk, create_pdarray, pdarray, RegistrationError, any
-from arkouda.pdarraycreation import arange, array, zeros
+from arkouda.pdarraycreation import arange, array, zeros, full
 from arkouda.pdarraysetops import argsort, concatenate, in1d
 from arkouda.strings import Strings
 from arkouda.util import convert_if_categorical, get_callback
@@ -171,7 +171,7 @@ class Series:
     def __getitem__(self, key):
         if isinstance(key, all_scalars):
             if dtype(type(key)) != self.index.dtype:
-                raise TypeError("Mismatch between Series index type and argument type", type(key), self.index_type)
+                raise TypeError("Mismatch between Series index type and argument type", type(key), self.index.dtype)
             indices = self.index == key
             return Series(index=self.index[indices], data=self.values[indices])
         
@@ -183,7 +183,7 @@ class Series:
         
         if isinstance(key, Strings):
             if self.index.dtype != dtype(str):
-                raise TypeError("Mismatch between Series index type and argument type", type(key), self.index_type)
+                raise TypeError("Mismatch between Series index type and argument type", type(key), self.index.dtype)
             indices = in1d(self.index.values, key)
             return Series(index=self.index[indices], data=self.values[indices])
         if isinstance(key, pdarray):
@@ -191,13 +191,12 @@ class Series:
             if key.dtype == dtype(bool):
                 return Series(index=self.index[key],data=self.values[key])
             if key.dtype != self.index.dtype:
-                raise TypeError("Mismatch between Series index type and argument type", type(key), self.index_type)
+                raise TypeError("Mismatch between Series index type and argument type", type(key), self.index.dtype)
             indices = in1d(self.index.values, key)
             return Series(index=self.index[indices], data=self.values[indices])
         raise TypeError("Series [] only supports indexing by scalars, lists of scalars, and arrays of scalars.")
     
     def __setitem__(self, key, val):
-
         if isinstance(key, all_scalars):
             if dtype(type(key)) != self.index.dtype:
                 raise TypeError("Unexpected key type. Received {} but expected {}".format(dtype(type(key)), self.index.dtype))
@@ -241,6 +240,58 @@ class Series:
         if isinstance(key, Series):
             # @TODO align the series indexes
             key = key.values
+        
+
+        if isinstance(key, Strings):
+            if self.index.dtype != dtype(str):
+                raise TypeError("Unexpected key type. Received String but expected {}".format(self.index.dtype))
+        elif isinstance(key, pdarray):
+            #always allow boolean lists, which are to be treated as masks
+            if key.dtype != self.index.dtype and key.dtype != dtype(bool):
+                raise TypeError("Unexpected key type. Received {} but expected {}".format(dtype(key), self.index.dtype))
+        else:
+            raise TypeError("Series [] only supports indexing by scalars, lists of scalars, and arrays of scalars.")
+        
+        indices = in1d(self.index.values, key)
+
+        if isinstance(val, all_scalars):
+            if dtype(type(val)) != self.values.dtype:
+                raise TypeError("Unexpected value type. Received {} but expected {}".format(dtype(type(val)), self.values.dtype))
+            if any(indices):
+                self.values[indices] = val
+            else:
+                #insert new row
+                new_keys = key[~in1d(key,self.index.values)]
+                new_index_values = concatenate([self.index.values, new_keys])
+                new_values = full(len(new_keys), val)
+                print('new keys:', new_keys)
+                self.index = Index.factory(new_index_values)
+                self.values = concatenate([self.values, new_values])
+            return
+        if isinstance(val, (list, tuple)):
+            if len(val) == 1:
+                self[key] = val[0]
+                return
+            val = array(val)
+        if isinstance(val, pdarray):
+            print("assigning pdarray to entries")
+            if val.dtype != self.values.dtype:
+                raise TypeError("Unexpected value type. Received {} but expected {}".format(dtype(type(val)), self.values.dtype))
+            if val.dtype == dtype(str):
+                raise TypeError("Cannot modify Strings.")
+            tf, counts = GroupBy(indices).count()
+            if counts[1] != len(val):
+                raise ValueError("cannot set using a list-like indexer with a different length from the value")
+            self.values[indices] = val
+            return
+
+        raise TypeError("This shouldn't be hit.")
+        
+    def loc(self):
+        return _LocIndexer(self)
+        
+
+        
  
 
             
@@ -830,3 +881,13 @@ class Series:
             retval = pd.concat([s.to_pandas() for s in arrays])
 
         return retval
+
+class _LocIndexer():
+    def __init__(self, series):
+        self.series = series
+
+    def __getitem__(self, key):
+        return self.series[key]
+
+    def __setitem__(self, key, val):
+        self.series[key] = val
