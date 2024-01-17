@@ -1,4 +1,5 @@
 import pandas as pd
+import numpy as np
 from base_test import ArkoudaTest
 from context import arkouda as ak
 
@@ -224,6 +225,17 @@ class SeriesTest(ArkoudaTest):
         series = ak.Series(data=g.sum("c")["c"], index=g.sum("c").index)
         g.broadcast(series)
 
+    def test_has_repeat_labels(self):
+        ints = ak.array([0,1,3,7,3])
+        floats = ak.array([0.0,1.5,0.5,1.5,-1.0])
+        strings = ak.array(['A','C','DE','C','Z'])
+        for idxs in [ints, floats, strings]:
+            s1 = ak.Series(index=idxs, data=floats)
+            self.assertTrue(s1.has_repeat_labels())
+        
+        s2 = ak.Series(index=ak.array([0,1,3,4,5]), data=floats)
+        self.assertFalse(s2.has_repeat_labels())
+
     def test_getitem_scalars(self):
         ints = ak.array([0,1,3,7,3])
         floats = ak.array([0.0,1.5,0.5,1.5,-1.0])
@@ -329,6 +341,8 @@ class SeriesTest(ArkoudaTest):
         strings = ['A','C','DE','C','Z']
         
         s1 = ak.Series(index=ak.array(strings), data=ak.array(floats))
+        _s1 = pd.Series(index=np.array(strings), data=np.array(floats))
+
         with self.assertRaises(TypeError):
             s1[1.0] = 1.0
         with self.assertRaises(TypeError):
@@ -339,14 +353,19 @@ class SeriesTest(ArkoudaTest):
             s1['A'] = 'C'
         
         s1['A'] = 0.2
-        self.assertListEqual(s1.values.to_list(), [0.2,1.5,0.5,1.5,-1.0])
+        _s1['A'] = 0.2
+        self.assertListEqual(s1.values.to_list(), _s1.values.tolist())
         s1['C'] = 1.2
-        self.assertListEqual(s1.values.to_list(), [0.2,1.2,0.5,1.2,-1.0])
+        _s1['C'] = 1.2
+        self.assertListEqual(s1.values.to_list(), _s1.values.tolist())
         s1['X'] = 0.0
-        self.assertListEqual(s1.index.to_list(), ['A','C','DE','C','Z', 'X'])
-        self.assertListEqual(s1.values.to_list(), [0.2,1.2,0.5,1.2,-1.0,0.0])
+        _s1['X'] = 0.0
+        self.assertListEqual(s1.index.to_list(), _s1.index.tolist())
+        self.assertListEqual(s1.values.to_list(), _s1.values.tolist())
         s1['C'] = [0.3, 0.4]
-        self.assertListEqual(s1.values.to_list(), [0.2,0.3,0.5,0.4,-1.0,0.0])
+        _s1['C'] = [0.3, 0.4]
+        self.assertListEqual(s1.values.to_list(),  _s1.values.tolist())
+
         with self.assertRaises(ValueError):
             s1['C'] = [0.4, 0.3, 0.2]
         
@@ -367,27 +386,49 @@ class SeriesTest(ArkoudaTest):
 
        
         s3 = ak.Series(index=ak.array(floats), data=ak.array(ints)) 
+        _s3 = pd.Series(index=np.array(floats), data=np.array(ints))
         self.assertListEqual(s3.values.to_list(), [0,1,3,7,3])
         self.assertListEqual(s3.index.to_list(), [0.0,1.5,0.5,1.5,-1.0])
+        self.assertListEqual(s3.values.to_list(), _s3.values.tolist())
+        self.assertListEqual(s3.index.to_list(), _s3.index.tolist())
         s3[0.0] = 2
-        self.assertListEqual(s3.values.to_list(), [2,1,3,7,3])
+        _s3[0.0] = 2
+        self.assertListEqual(s3.values.to_list(), _s3.values.tolist())
+        _s3[1.5] = 8
         s3[1.5] = 8
-        self.assertListEqual(s3.values.to_list(),  [2,8,3,8,3])
+        self.assertListEqual(s3.values.to_list(),  _s3.values.tolist())
+        _s3[2.0] = 9
         s3[2.0] = 9
-        self.assertListEqual(s3.index.to_list(), [0.0,1.5,0.5,1.5,-1.0,2.0])
-        self.assertListEqual(s3.values.to_list(), [2,8,3,8,3,9])
+        self.assertListEqual(s3.index.to_list(), _s3.index.tolist())
+        self.assertListEqual(s3.values.to_list(), _s3.values.tolist())
+        _s3[1.5] = 4,5
         s3[1.5] = [4,5]
-        self.assertListEqual(s3.values.to_list(), [2,4,3,5,3,9])
+        self.assertListEqual(s3.values.to_list(), _s3.values.tolist())
+        _s3[1.5] = np.array([6,7])
         s3[1.5] = ak.array([6,7])
-        self.assertListEqual(s3.values.to_list(), [2,6,3,7,3,9])
+        self.assertListEqual(s3.values.to_list(), _s3.values.tolist())
+        _s3[1.5] = [8]
         s3[1.5] = [8]
-        self.assertListEqual(s3.values.to_list(), [2,8,3,8,3,9])
+        self.assertListEqual(s3.values.to_list(), _s3.values.tolist())
+        s3[1.5] = ak.array([2])
+        _s3[1.5] = np.array([2])
+        self.assertListEqual(s3.values.to_list(), _s3.values.tolist())
         with self.assertRaises(ValueError):
             s3[1.5] = [9,10,11]
         with self.assertRaises(ValueError):
             s3[1.5] = ak.array([0,1,2])
+
+        #adding new entries
+        _s3[-1.0] = 14
+        s3[-1.0] = 14
+        self.assertListEqual(s3.values.to_list(), _s3.values.tolist())
+        self.assertListEqual(s3.index.to_list(), _s3.index.tolist())
+        
+        #pandas makes the entry a list, which is not what we want.
         with self.assertRaises(ValueError):
-            s3[1.5] = ak.array([0])
+            s3[-11.0] = [13,14,15]
+        
+            
 
     def test_setitem_vectors(self):
         ints = [0,1,3,7,3]
@@ -395,6 +436,9 @@ class SeriesTest(ArkoudaTest):
         strings = ['A','C','DE','C','Z']
 
         s1 = ak.Series(index=ak.array(strings), data=ak.array(floats))
+        _s1 = pd.Series(index=np.array(strings), data=np.array(floats))
+
+        #mismatching types for values and indices
         with self.assertRaises(TypeError):
             s1[[0.1,0.2]] = 1.0
         with self.assertRaises(TypeError):
@@ -408,76 +452,111 @@ class SeriesTest(ArkoudaTest):
         with self.assertRaises(TypeError):
             s1[ak.array(['A','B'])] = 1
         
-        s1[['A','Z']] = 2.0
-        self.assertListEqual(s1.values.to_list(), [2.0,1.5,0.5,1.5,2.0])
-        s1[ak.array(['A','Z'])] = 3.0
-        self.assertListEqual(s1.values.to_list(), [3.0,1.5,0.5,1.5,3.0])
-        s1[ak.array(['B','D'])] = 0.3
-        self.assertListEqual(s1.values.to_list(), [3.0,1.5,0.5,1.5,3.0, 0.3, 0.3])
-        self.assertListEqual(s1.index.to_list(), ['A','C','DE','C','Z', 'B','D'])
-        s1[ak.array(['A','C'])] = [1.0,1.1,1.2]
-        self.assertListEqual(s1.values.to_list(), [1.0,1.1,0.5,1.2,3.0, 0.3, 0.3])
-        s1[('B', 'D')] = [8.0]
-        self.assertListEqual(s1.values.to_list(), [1.0,1.1,0.5,1.2,3.0,8.0,8.0])
+        #indexing using list of labels only valid with uniquely labeled Series
+        with self.assertRaises(pd.errors.InvalidIndexError):
+            _s1[['A','Z']] = 2.0
+        self.assertTrue(s1.has_repeat_labels())
         with self.assertRaises(ValueError):
-            s1[['B', 'D']] = [8.0,1.0,1.0]
+            s1[['A','Z']] = 2.0
+
+        s2 = ak.Series(index=ak.array(['A','C','DE','F','Z']), data = ak.array(floats))
+        _s2 = pd.Series(index=pd.array(['A','C','DE','F','Z']), data = pd.array(floats))
+        s2[['A','Z']] = 2.0
+        _s2[['A','Z']] = 2.0
+        self.assertListEqual(s2.values.to_list(), _s2.values.tolist())
+        s2[ak.array(['A','Z'])] = 3.0
+        _s2[np.array(['A','Z'])] = 3.0
+        self.assertListEqual(s2.values.to_list(), _s2.values.tolist())
+        with self.assertRaises(ValueError):
+            _s2[np.array(['A','Z'])] = [3.0]
+        with self.assertRaises(ValueError):
+            s2[ak.array(['A','Z'])] = [3.0]
         
+        with self.assertRaises(KeyError):
+            _s2[np.array(['B','D'])] = 0.3
+        with self.assertRaises(KeyError):
+            s2[ak.array(['B','D'])] = 0.3
+        with self.assertRaises(KeyError):
+            _s2[['B','D']] = 0.3
+        with self.assertRaises(KeyError):
+            s2[['B','D']] = 0.3
+        with self.assertRaises(KeyError):
+            _s2[['B']] = 0.3
+        with self.assertRaises(KeyError):
+            s2[['B']] = 0.3
+        self.assertListEqual(s2.values.to_list(), _s2.values.tolist())
+        self.assertListEqual(s2.index.to_list(), _s2.index.tolist())
+        
+        
+        _s2[np.array(['A','C','F'])] = [1.0,1.1,1.2]
+        s2[ak.array(['A','C','F'])] = [1.0,1.1,1.2]
+        self.assertListEqual(s2.values.to_list(), _s2.values.tolist())
+        
+    def test_iloc(self):
+        ints = [0,1,3,7,3]
+        floats = [0.0,1.5,0.5,1.5,-1.0]
+        strings = ['A','C','DE','C','Z']
+        s1 = ak.Series(index=ak.array(strings), data=ak.array(floats))
+        _s1 = pd.Series(index=np.array(strings), data=np.array(floats))
 
-    def test_loc(self):
-        ints = ak.array([0,1,3,7,3])
-        floats = ak.array([0.0,1.5,0.5,1.5,-1.0])
-        strings = ak.array(['A','C','DE','C','Z'])
-
-        s1 = ak.Series(index=strings, data=floats)
         with self.assertRaises(TypeError):
-            s1.loc[1.0]
+            s1.iloc['A']
         with self.assertRaises(TypeError):
-            s1.loc[1]
-        s1_a1 = s1.loc['A']
+            s1.iloc['A'] = 1.0
+        with self.assertRaises(TypeError):
+            s1.iloc[0] = 1
+        
+        s1_a1 = s1.iloc[0]
         self.assertTrue(isinstance(s1_a1, ak.Series))
         self.assertListEqual(s1_a1.index.to_list(), ['A'])
         self.assertListEqual(s1_a1.values.to_list(), [0.0])
-        s1_a2 = s1.loc['C']
-        self.assertTrue(isinstance(s1_a2, ak.Series))
-        self.assertListEqual(s1_a2.index.to_list(), ['C','C'])
-        self.assertListEqual(s1_a2.values.to_list(), [1.5,1.5])
+        _s1.iloc[0] = 1.0
+        s1.iloc[0] = 1.0
+        self.assertListEqual(s1.values.to_list(), _s1.values.tolist())
 
-        s2 = ak.Series(index=ints,data=strings)
+        with self.assertRaises(pd.errors.IndexingError):
+            _s1_a2 = _s1.iloc[1,3]
         with self.assertRaises(TypeError):
-            s2.loc[1.0]
+            s1_a2 = s1.iloc[1,3]
+        with self.assertRaises(IndexError):
+            _s1.iloc[1,3] = 2.0
         with self.assertRaises(TypeError):
-            s2.loc['A']
-        s2_a1 = s2.loc[7]
-        self.assertTrue(isinstance(s2_a1, ak.Series))
-        self.assertListEqual(s2_a1.index.to_list(), [7])
-        self.assertListEqual(s2_a1.values.to_list(), ['C'])
+            s1.iloc[1,3] = 2.0
+        
+        _s1_a2 = _s1.iloc[[1,2]]
+        s1_a2 = s1.iloc[[1,2]]
+        self.assertListEqual(s1_a2.index.to_list(), _s1_a2.index.tolist())
+        self.assertListEqual(s1_a2.values.to_list(), _s1_a2.values.tolist())
+        _s1.iloc[[1,2]] = 0.2
+        s1.iloc[[1,2]] = 0.2
+        self.assertListEqual(s1.values.to_list(), _s1.values.tolist())
 
-        s2_a2 = s2.loc[3]
-        self.assertTrue(isinstance(s2_a2, ak.Series))
-        self.assertListEqual(s2_a2.index.to_list(), [3,3])
-        self.assertListEqual(s2_a2.values.to_list(), ['DE', 'Z'])
+        with self.assertRaises(ValueError):
+            _s1.iloc[[3,4]] = [0.3]
+        with self.assertRaises(ValueError):
+            s1.iloc[[3,4]] = [0.3]
+        
+        s1.iloc[[3,4]] = [0.4, 0.5]
+        self.assertListEqual(s1.values.to_list(), [1.0,0.2,0.2,0.4,0.5])
 
-        s3 = ak.Series(index=floats, data=ints)
         with self.assertRaises(TypeError):
-            s3.loc[1]
-        with self.assertRaises(TypeError):
-            s3.loc['A']
-        s3_a1 = s3.loc[0.0]
-        self.assertTrue(isinstance(s3_a1, ak.Series))
-        self.assertListEqual(s3_a1.index.to_list(), [0.0])
-        self.assertListEqual(s3_a1.values.to_list(), [0])
+            #in pandas this hits a NotImplementedError
+            s1.iloc[3,4] = [0.4, 0.5]
 
-        s3_a2 = s3.loc[1.5]
-        self.assertTrue(isinstance(s3_a2, ak.Series))
-        self.assertListEqual(s3_a2.index.to_list(), [1.5,1.5])
-        self.assertListEqual(s3_a2.values.to_list(), [1,7])
-        pass
+        with self.assertRaises(ValueError):
+            s1.iloc[[3,4]] = ak.array([0.3])
+        with self.assertRaises(ValueError):
+            s1.iloc[[3,4]] = [0.1,0.2,0.3]
+        
+        # iloc does not enlarge its target object
+        with self.assertRaises(IndexError):
+            _s1.iloc[5]
+        with self.assertRaises(IndexError):
+            s1.iloc[5]
+        with self.assertRaises(IndexError):
+            s1.iloc[5] = 2
+        with self.assertRaises(IndexError):
+            s1.iloc[[3,5]]
+        with self.assertRaises(IndexError):
+            s1.iloc[[3,5]] = [0.1,0.2]
 
-    def test_iloc(self):
-        pass
-
-    def test_at(self):
-        pass
-
-    def test_iat(self):
-        pass
