@@ -168,7 +168,7 @@ class Series:
             + length_str
         )
 
-    def validate_key(self, key):
+    def validate_key(self, key) -> Union[pdarray, Strings, all_scalars]:
         if isinstance(key, list):
             key = array(key)
         if isinstance(key, tuple):
@@ -186,22 +186,50 @@ class Series:
             if any(~in1d(key, self.index.values)):
                 raise KeyError("{} not in index".format(key[~in1d(key, self.index.values)]))
         elif isinstance(key, pdarray):
-            if key.dtype != self.index.dtype and key.dtype != bool:
+            if key.dtype == self.index.dtype:
+                if any(~in1d(key, self.index.values)):
+                    raise KeyError("{} not in index".format(key[~in1d(key, self.index.values)]))
+            elif key.dtype == bool:
+                if key.size != self.index.size:
+                    raise IndexError("Boolean index has wrong length: {} instead of {}".format(key.size, self.size))
+            else:
                 raise TypeError("Unexpected key type. Received {} but expected {}".format(dtype(type(key)), self.index.dtype))
-            if any(~in1d(key, self.index.values)):
-                raise KeyError("{} not in index".format(key[~in1d(key, self.index.values)]))
+            
         else:
             raise TypeError("Series [] only supports indexing by scalars, lists of scalars, and arrays of scalars.")
         return key
     
-    
-    
-    def __getitem__(self, key):
+    def __getitem__(self, key) -> Series:
         key = self.validate_key(key)
-        indices = key if key.dtype == bool else in1d(self.index.values, key)
+        indices = None
+        if isinstance(key, all_scalars):
+            indices = key == self.index.values
+        elif key.dtype == bool:
+            indices = key
+        else:
+            indices = in1d(self.index.values, key)
         return Series(index=self.index[indices], data=self.values[indices])
     
-    def validate_val(self, val):
+    def validate_val(self, val: Union[pdarray, Strings, all_scalars, list, tuple]) -> Union[pdarray, all_scalars]:
+        """
+        Validates type requirements for values being written into the Series. Also converts list and tuple arguments into pdarrays.
+
+        Parameters
+        ----------
+        val: pdarray, Strings, list, tuple, all_scalars
+            The value or container of values that might be assigned into the Series.
+
+        Returns
+        -------
+        The validated value, with lists and tuples converted to pdarrays
+
+        Raises
+        ------
+        TypeError
+            Raised if val is not the same type or a container with elements of the same time as the Series
+            Raised if val is a string or Strings type.
+            Raised if val is not one of the supported types
+        """
         if isinstance(val, (list, tuple)):
             val = array(val)
         if isinstance(val, all_scalars):
@@ -218,7 +246,10 @@ class Series:
             raise TypeError("cannot set with unsupported value type: {}".format(type(val)))
         return val
     
-    def has_repeat_labels(self):
+    def has_repeat_labels(self) -> bool:
+        """
+        Returns whether the Series has any labels that appear more than once
+        """
         tf, counts = GroupBy(self.index.values).count()
         return counts.size != self.index.size
 
@@ -244,25 +275,28 @@ class Series:
             self.values[indices] = val
             return
         else:
+            if val.size == 1 and isinstance(key, all_scalars):
+                self.values[indices] = val[0]
+                return
             if update_count != val.size:
                 raise ValueError("Cannot set using a list-like indexer with a different length from the value")
             self.values[indices] = val
             return
 
     @property 
-    def loc(self):
+    def loc(self) -> _LocIndexer:
         return _LocIndexer(self)
 
     @property
-    def at(self):
+    def at(self) -> _LocIndexer:
         return _LocIndexer(self)
 
     @property
-    def iloc(self):
+    def iloc(self) -> _iLocIndexer:
         return _iLocIndexer('iloc', self)
 
     @property
-    def iat(self):
+    def iat(self) -> _iLocIndexer:
         return _iLocIndexer('iat', self) 
 
         
@@ -871,7 +905,7 @@ class _iLocIndexer():
         self.name = method_name
         self.series = series
 
-    def validate_key(self, key):
+    def validate_key(self, key) -> Union[pdarray, Strings, all_scalars]:
         if isinstance(key, list):
             key = array(key)
         if isinstance(key, tuple):
@@ -879,10 +913,14 @@ class _iLocIndexer():
         if isinstance(key, pdarray):
             if len(key) == 0:
                 raise ValueError("Cannot index using 0-length iterables.")
-            if key.dtype != int64:
+            if key.dtype != int64 and key.dtype != bool:
                 raise TypeError(".{} requires integer keys".format(self.name))
-            if any(key >= self.series.size):
+            
+            if key.dtype == bool and key.size != self.series.size:
+                raise IndexError("Boolean index has wrong length: {} instead of {}".format(key.size, self.series.size))
+            elif any(key >= self.series.size):
                 raise IndexError("{} cannot enlarge its target object.".format(self.name))
+            
         elif isinstance(key, int):
             if key >= self.series.size:
                 raise IndexError("{} cannot enlarge its target object.".format(self.name))
@@ -890,11 +928,10 @@ class _iLocIndexer():
             raise TypeError(".{} requires integer keys".format(self.name))
         return key
     
-    def validate_val(self, val):
+    def validate_val(self, val) -> Union[pdarray, all_scalars]:
         return self.series.validate_val(val)
-        return array([series_validated]) if isinstance(series_validated, all_scalars) else series_validated
     
-    def __getitem__(self, key):
+    def __getitem__(self, key) -> Series:
         key = self.validate_key(key)
         if isinstance(key, all_scalars):
             key = array([key])
@@ -911,7 +948,7 @@ class _iLocIndexer():
             if isinstance(key, all_scalars):
                 self.series.values[key] = val
                 return
-            if len(val) != len(key):
+            if key.dtype == int64 and len(val) != len(key):
                 raise ValueError("cannot set using a list-like indexer with a different length than the value")
         self.series.values[key] = val
             
