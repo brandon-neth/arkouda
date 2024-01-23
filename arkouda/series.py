@@ -19,19 +19,31 @@ from arkouda.numeric import cast as akcast
 from arkouda.numeric import value_counts
 from arkouda.pdarrayclass import argmaxk, create_pdarray, pdarray, RegistrationError, any
 from arkouda.pdarraycreation import arange, array, zeros, full
-from arkouda.pdarraysetops import argsort, concatenate, in1d
+from arkouda.pdarraysetops import argsort, concatenate, in1d, indexof1d
 from arkouda.strings import Strings
 from arkouda.util import convert_if_categorical, get_callback
+
+from arkouda.client import generic_msg
+
 
 # pd.set_option("display.max_colwidth", 65) is being called in DataFrame.py. This will resolve BitVector
 # truncation issues. If issues arise, that's where to look for it.
 
 __all__ = [
     "Series",
+    "series_indexing"
 ]
 
 import operator
 
+def series_indexing(arg1, arg2):
+    generic_msg(
+            cmd="seriesIndexing",
+            args={
+                "arg1": arg1,
+                "arg2": arg2,
+                'assume_unique': False}
+    );
 
 def natural_binary_operators(cls):
     for name, op in {
@@ -169,6 +181,30 @@ class Series:
         )
 
     def validate_key(self, key) -> Union[pdarray, Strings, all_scalars]:
+        """
+        Validates type requirements for keys when reading or writing the Series.
+        Also converts list and tuple arguments into pdarrays.
+
+        Parameters
+        ----------
+        key: pdarray, Strings, list, tuple, all_scalars
+            The key or container of keys that might be used to index into the Series.
+
+        Returns
+        -------
+        The validated key(s), with lists and tuples converted to pdarrays
+
+        Raises
+        ------
+        TypeError
+            Raised if keys are not boolean values or the type of the labels
+            Raised if key is not one of the supported types
+        KeyError
+            Raised if container of keys has keys not present in the Series
+        IndexError
+            Raised if the length of a boolean key array is different 
+            from the Series 
+        """
         if isinstance(key, list):
             key = array(key)
         if isinstance(key, tuple):
@@ -199,29 +235,46 @@ class Series:
             raise TypeError("Series [] only supports indexing by scalars, lists of scalars, and arrays of scalars.")
         return key
     
-    def __getitem__(self, key) -> Series:
+    def __getitem__(self, key: Union[Series, pdarray, Strings, list, all_scalars] ) -> Union[Series, all_scalars]:
+        """
+        Gets values from Series.
+
+        Parameters
+        ----------
+        key: pdarray, Strings, Series, list, all_scalars
+            The key or container of keys to get entries for.
+
+        Returns
+        -------
+        Series with all entries with matching labels. If only one entry in the
+        Series is accessed, returns a scalar.
+        """
         key = self.validate_key(key)
-        indices = None
         if isinstance(key, all_scalars):
-            indices = key == self.index.values
+            key = array([key])
         elif key.dtype == bool:
-            indices = key
+            # boolean array indexes without sorting 
+            return Series(index=self.index[key], data=self.values[key])
+
+        indices = indexof1d(key, self.index.values)
+        if indices.size == 1:
+            return self.values[indices[0]]
         else:
-            indices = in1d(self.index.values, key)
-        return Series(index=self.index[indices], data=self.values[indices])
+            return Series(index=self.index[indices], data=self.values[indices])
+        
     
-    def validate_val(self, val: Union[pdarray, Strings, all_scalars, list, tuple]) -> Union[pdarray, all_scalars]:
+    def validate_val(self, val: Union[pdarray, Strings, all_scalars, list]) -> Union[pdarray, all_scalars]:
         """
         Validates type requirements for values being written into the Series. Also converts list and tuple arguments into pdarrays.
 
         Parameters
         ----------
-        val: pdarray, Strings, list, tuple, all_scalars
+        val: pdarray, Strings, list, all_scalars
             The value or container of values that might be assigned into the Series.
 
         Returns
         -------
-        The validated value, with lists and tuples converted to pdarrays
+        The validated value, with lists converted to pdarrays
 
         Raises
         ------
@@ -230,7 +283,7 @@ class Series:
             Raised if val is a string or Strings type.
             Raised if val is not one of the supported types
         """
-        if isinstance(val, (list, tuple)):
+        if isinstance(val, list):
             val = array(val)
         if isinstance(val, all_scalars):
             if dtype(type(val)) != self.values.dtype:
@@ -245,15 +298,27 @@ class Series:
         else:
             raise TypeError("cannot set with unsupported value type: {}".format(type(val)))
         return val
-    
-    def has_repeat_labels(self) -> bool:
-        """
-        Returns whether the Series has any labels that appear more than once
-        """
-        tf, counts = GroupBy(self.index.values).count()
-        return counts.size != self.index.size
 
-    def __setitem__(self, key, val):
+    def __setitem__(self, key: Union[Series, list, pdarray, Strings, all_scalars], 
+                    val: Union[list, pdarray, all_scalars]):
+        """
+        Sets or adds entries in a Series by label. 
+
+        Parameters
+        ----------
+        key: pdarray, Strings, Series, list, all_scalars
+            The key or container of keys to set entries for.
+
+        val: pdarray, list, all_scalars
+            The values to set/add to the Series.
+
+        Raises
+        ------
+        ValueError
+            Raised when setting multiple values to a Series with repeated labels
+            Raised when number of values provided does not match the number of 
+            entries to set.
+        """
         val = self.validate_val(val)
         key = self.validate_key(key)
         
@@ -283,27 +348,61 @@ class Series:
             self.values[indices] = val
             return
 
+    def has_repeat_labels(self) -> bool:
+        """
+        Returns whether the Series has any labels that appear more than once
+        """
+        tf, counts = GroupBy(self.index.values).count()
+        return counts.size != self.index.size
+    
     @property 
     def loc(self) -> _LocIndexer:
+        """
+        Accesses entries of a Series by label
+
+        Parameters
+        ----------
+        key: pdarray, Strings, Series, list, all_scalars
+            The key or container of keys to access entries for
+        """
         return _LocIndexer(self)
 
     @property
     def at(self) -> _LocIndexer:
+        """
+        Accesses entries of a Series by label
+
+        Parameters
+        ----------
+        key: pdarray, Strings, Series, list, all_scalars
+            The key or container of keys to access entries for
+        """
         return _LocIndexer(self)
 
     @property
     def iloc(self) -> _iLocIndexer:
+        """
+        Accesses entries of a Series by position
+
+        Parameters
+        ----------
+        key: int
+            The positions or container of positions to access entries for
+        """
         return _iLocIndexer('iloc', self)
 
     @property
     def iat(self) -> _iLocIndexer:
+        """
+        Accesses entries of a Series by position
+
+        Parameters
+        ----------
+        key: int
+            The positions or container of positions to access entries for
+        """
         return _iLocIndexer('iat', self) 
 
-        
- 
-
-            
-            
 
     dt = CachedAccessor("dt", DatetimeAccessor)
     str_acc = CachedAccessor("str", StringAccessor)
@@ -587,8 +686,7 @@ class Series:
         Objects registered with the server are immune to deletion until
         they are unregistered.
         """
-        from arkouda.client import generic_msg
-
+        
         if self.registered_name is not None and self.is_registered():
             raise RegistrationError(f"This object is already registered as {self.registered_name}")
         generic_msg(

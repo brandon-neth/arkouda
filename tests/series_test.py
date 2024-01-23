@@ -249,11 +249,13 @@ class SeriesTest(ArkoudaTest):
             s1[1]
         _s1_a1 = _s1['A']
         s1_a1 = s1['A']
-        self.assertTrue(isinstance(s1_a1, ak.Series))
-        self.assertListEqual(s1_a1.index.to_list(), _s1_a1.index.tolist())
-        self.assertListEqual(s1_a1.values.to_list(), _s1_a1.values.tolist())
+        
+        self.assertTrue(isinstance(_s1_a1, float))
+        self.assertTrue(isinstance(s1_a1, float))
+        self.assertEqual(s1_a1, _s1_a1)
         _s1_a2 = _s1['C']
         s1_a2 = s1['C']
+        self.assertTrue(isinstance(_s1_a2, pd.Series))
         self.assertTrue(isinstance(s1_a2, ak.Series))
         self.assertListEqual(s1_a2.index.to_list(), _s1_a2.index.tolist())
         self.assertListEqual(s1_a2.values.to_list(), _s1_a2.values.tolist())
@@ -266,13 +268,14 @@ class SeriesTest(ArkoudaTest):
             s2['A']
         _s2_a1 = _s2[7]
         s2_a1 = s2[7]
-        self.assertTrue(isinstance(s1_a2, ak.Series))
-        self.assertListEqual(s2_a1.index.to_list(), _s2_a1.index.tolist())
-        self.assertListEqual(s2_a1.values.to_list(), _s2_a1.values.tolist())
+        self.assertTrue(isinstance(_s2_a1, str))
+        self.assertTrue(isinstance(s2_a1, str))
+        self.assertEqual(_s2_a1, s2_a1)
 
        
         _s2_a2 = _s2[3]
         s2_a2 = s2[3]
+        self.assertTrue(isinstance(_s2_a2, pd.Series))
         self.assertTrue(isinstance(s2_a2, ak.Series))
         self.assertListEqual(s2_a2.index.to_list(), _s2_a2.index.tolist())
         self.assertListEqual(s2_a2.values.to_list(), _s2_a2.values.tolist())
@@ -285,12 +288,13 @@ class SeriesTest(ArkoudaTest):
             s3['A']
         _s3_a1 = _s3[0.0]
         s3_a1 = s3[0.0]
-        self.assertTrue(isinstance(s3_a1, ak.Series))
-        self.assertListEqual(s3_a1.index.to_list(), _s3_a1.index.tolist())
-        self.assertListEqual(s3_a1.values.to_list(), _s3_a1.values.tolist())
+        self.assertIsInstance(_s3_a1, np.int64)
+        self.assertIsInstance(s3_a1, np.int64)
+
 
         _s3_a2 = _s3[1.5]
         s3_a2 = s3[1.5]
+        self.assertTrue(isinstance(_s3_a2, pd.Series))
         self.assertTrue(isinstance(s3_a2, ak.Series))
         self.assertListEqual(s3_a2.index.to_list(), _s3_a2.index.tolist())
         self.assertListEqual(s3_a2.values.to_list(), _s3_a2.values.tolist())
@@ -364,8 +368,13 @@ class SeriesTest(ArkoudaTest):
         self.assertListEqual(s2_a2.index.to_list(), _s2_a2.index.tolist())
         self.assertListEqual(s2_a2.values.to_list(), _s2_a2.values.tolist())
 
-        _s2_a3 = _s2[[1.5,1.2]]
-        s2_a3 = s2[[1.5,1.2]]
+        with self.assertRaises(KeyError):
+            _s2_a3 = _s2[[1.5,1.2]]
+        with self.assertRaises(KeyError):
+            s2_a3 = s2[[1.5,1.2]]
+
+        _s2_a3 = _s2[[1.5,0.0]]
+        s2_a3 = s2[[1.5,0.0]]
         self.assertTrue(isinstance(s2_a2, ak.Series))
         self.assertListEqual(s2_a3.index.to_list(), _s2_a3.index.tolist())
         self.assertListEqual(s2_a3.values.to_list(), _s2_a3.values.tolist())
