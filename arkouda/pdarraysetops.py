@@ -235,13 +235,11 @@ def in1dmulti(a, b, assume_unique=False, symmetric=False):
 
 def indexof1d(
     keys: groupable,
-    arr: groupable,
-    ordered = True
+    arr: groupable
 ) -> Union[pdarray, groupable]:
     """
     Returns an integer array of the index values where the values of the first
-    array appear in the second. Optionally, the index values can be sorted
-    based on the order of the values in the first array. 
+    array appear in the second.
 
     Parameters
     ----------
