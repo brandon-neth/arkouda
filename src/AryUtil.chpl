@@ -12,9 +12,8 @@ module AryUtil
     use PrivateDist;
     use Communication;
 
-    use ArkoudaPOSIXCompat;
+    use OS.POSIX;
     use ArkoudaCTypesCompat;
-    use ArkoudaBlockCompat;
     use ArkoudaRandomCompat;
 
     use CommAggregation;

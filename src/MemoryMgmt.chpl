@@ -7,7 +7,7 @@ module MemoryMgmt {
 
     use Logging;
     use ServerErrors;
-    use ArkoudaMemDiagnosticsCompat;
+    use MemDiagnostics;
     use ArkoudaFileCompat;
     use ArkoudaMathCompat;
 

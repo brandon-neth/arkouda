@@ -320,6 +320,12 @@ ifdef REGEX_MAX_CAPTURES
 	REGEX_MAX_CAPTURES_FLAG = -sregexMaxCaptures=$(REGEX_MAX_CAPTURES)
 endif
 
+ifdef USE_TRRY_CREATE_ARRAY
+	OPTIONAL_SERVER_FLAGS += -suseTryCreateArray=true
+else
+	OPTIONAL_SERVER_FLAGS += -suseTryCreateArray=false
+endif
+
 ARKOUDA_SOURCES = $(shell find $(ARKOUDA_SOURCE_DIR)/ -type f -name '*.chpl')
 ARKOUDA_MAIN_SOURCE := $(ARKOUDA_SOURCE_DIR)/$(ARKOUDA_MAIN_MODULE).chpl
 

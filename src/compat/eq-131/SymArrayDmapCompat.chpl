@@ -1,6 +1,7 @@
 
 module SymArrayDmapCompat
 {
+    
     use ChplConfig;
 
     /*

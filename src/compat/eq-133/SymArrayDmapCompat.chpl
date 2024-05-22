@@ -3,6 +3,7 @@ module SymArrayDmapCompat
 {
     use ChplConfig;
 
+    config param useTryCreateArray = true;
     /*
      Available domain maps.
      */
@@ -64,7 +65,12 @@ module SymArrayDmapCompat
       where N == 1
     {
       var dom = makeDistDom((...shape));
-      return dom.tryCreateArray(etype);
+      if useTryCreateArray {
+        return dom.tryCreateArray(etype);
+      } else {
+        var a: [dom] etype;
+        return a;
+      }
     }
 
     proc makeDistArray(shape: int ...?N, type etype) throws
@@ -84,7 +90,7 @@ module SymArrayDmapCompat
     proc makeDistArray(in a: [?D] ?etype) throws
       where D.rank == 1 && (MyDmap == Dmap.defaultRectangular || !a.isDefaultRectangular())
     {
-      var res = D.tryCreateArray(etype);
+      var res = if useTryCreateArray then D.tryCreateArray(etype) else makeDistArray((...D.shape), etype);
       res = a;
       return res;
     }
@@ -98,7 +104,7 @@ module SymArrayDmapCompat
     proc makeDistArray(D: domain(?), type etype) throws
       where D.rank == 1
     {
-      var res = D.tryCreateArray(etype);
+      var res = if useTryCreateArray then D.tryCreateArray(etype) else makeDistArray((...D.shape), etype);
       return res;
     }
 
@@ -112,7 +118,8 @@ module SymArrayDmapCompat
     proc makeDistArray(D: domain(?), initExpr: ?t) throws
       where D.rank == 1
     {
-      return D.tryCreateArray(t, initExpr);
+      var res: [D] t = if useTryCreateArray then D.tryCreateArray(t, initExpr) else initExpr;
+      return res;
     }
 
     proc makeDistArray(D: domain(?), initExpr: ?t) throws

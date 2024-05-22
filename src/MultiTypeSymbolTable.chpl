@@ -14,7 +14,6 @@ module MultiTypeSymbolTable
     use Map;
     use ArkoudaRegexCompat;
     use ArkoudaFileCompat;
-    use ArkoudaMapCompat;
     use ArkoudaIOCompat;
     use ArkoudaSymEntryCompat;
     use Registry;
