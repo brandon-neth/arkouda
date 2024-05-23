@@ -1,6 +1,6 @@
 module repro
 {
-    use ArkoudaMemDiagnosticsCompat;
+    use MemDiagnostics;
     
     config const perLocaleMemLimit = 80;
     
