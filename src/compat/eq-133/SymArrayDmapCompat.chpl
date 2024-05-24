@@ -104,8 +104,12 @@ module SymArrayDmapCompat
     proc makeDistArray(D: domain(?), type etype) throws
       where D.rank == 1
     {
-      var res = if useTryCreateArray then D.tryCreateArray(etype) else makeDistArray((...D.shape), etype);
-      return res;
+      if useTryCreateArray {
+        return D.tryCreateArray(etype);
+      } else {
+        var res: [D] etype;
+        return res;
+      }
     }
 
     proc makeDistArray(D: domain(?), type etype) throws

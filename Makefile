@@ -211,7 +211,7 @@ $(ARROW_O): $(ARROW_CPP) $(ARROW_H)
 CHPL_MAJOR := $(shell $(CHPL) --version | sed -n "s/chpl version \([0-9]\)\.[0-9]*.*/\1/p")
 CHPL_MINOR := $(shell $(CHPL) --version | sed -n "s/chpl version [0-9]\.\([0-9]*\).*/\1/p")
 CHPL_VERSION_OK := $(shell test $(CHPL_MAJOR) -ge 2 -o $(CHPL_MINOR) -ge 32  && echo yes)
-CHPL_VERSION_WARN := $(shell test $(CHPL_MAJOR) -eq 1 -a $(CHPL_MINOR) -le 33 && echo yes)
+CHPL_VERSION_WARN := $(shell test $(CHPL_MAJOR) -eq 1 -a $(CHPL_MINOR) -le 32 && echo yes)
 .PHONY: check-chpl
 check-chpl:
 ifneq ($(CHPL_VERSION_OK),yes)
@@ -320,7 +320,7 @@ ifdef REGEX_MAX_CAPTURES
 	REGEX_MAX_CAPTURES_FLAG = -sregexMaxCaptures=$(REGEX_MAX_CAPTURES)
 endif
 
-ifdef USE_TRRY_CREATE_ARRAY
+ifeq ($(USE_TRY_CREATE_ARRAY),1)
 	OPTIONAL_SERVER_FLAGS += -suseTryCreateArray=true
 else
 	OPTIONAL_SERVER_FLAGS += -suseTryCreateArray=false
