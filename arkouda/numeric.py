@@ -4,7 +4,7 @@ from typing import ForwardRef, List, Optional, Sequence, Tuple, Union
 from typing import cast as type_cast
 from typing import no_type_check
 
-import numpy as np  # type: ignore
+import numpy as np
 from typeguard import typechecked
 
 from arkouda.client import generic_msg
@@ -247,35 +247,11 @@ def ceil(pda: pdarray) -> pdarray:
 @typechecked
 def floor(pda: pdarray) -> pdarray:
     """
-    Return the element-wise floor of the array.
-
-    Parameters
-    ----------
-    pda : pdarray
-
-    Returns
-    -------
-    pdarray
-        A pdarray containing floor values of the input array elements
-
-    Raises
-    ------
-    TypeError
-        Raised if the parameter is not a pdarray
-
-    Examples
-    --------
-    >>> ak.floor(ak.linspace(1.1,5.5,5))
-    array([1, 2, 3, 4, 5])
+    Alias of arkouda.numpy.floor
     """
-    repMsg = generic_msg(
-        cmd=f"efunc{pda.ndim}D",
-        args={
-            "func": "floor",
-            "array": pda,
-        },
-    )
-    return create_pdarray(type_cast(str, repMsg))
+    from arkouda.numpy import floor as ak_floor
+
+    return ak_floor(pda)
 
 
 @typechecked
@@ -481,7 +457,7 @@ def isnan(pda: pdarray) -> pdarray:
     >>> ak.isnan(ak.array[1.0, 2.0, 1.0 / 0.0])
     array([False, False, True])
     """
-    from arkouda.util import is_numeric, is_float
+    from arkouda.util import is_float, is_numeric
 
     if is_numeric(pda) and not is_float(pda):
         from arkouda.pdarraycreation import full

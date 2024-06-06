@@ -1,10 +1,12 @@
 from __future__ import annotations
 
+import builtins
 import json
-from typing import TYPE_CHECKING, List, Optional, Union, Tuple
+from typing import TYPE_CHECKING, List, Optional, Tuple, Union
 
-import pandas as pd  # type: ignore
+import pandas as pd
 from numpy import array as ndarray
+from numpy import dtype as npdtype
 from typeguard import typechecked
 
 from arkouda import Categorical, Strings
@@ -114,13 +116,26 @@ class Index:
     def __getitem__(self, key):
         from arkouda.series import Series
 
+        allow_list = False
+        if isinstance(self.values, list):
+            allow_list = True
+
         if isinstance(key, Series):
             key = key.values
 
         if isinstance(key, int):
             return self.values[key]
 
-        return Index(self.values[key])
+        if isinstance(key, list):
+            if len(key) < self.max_list_size:
+                return Index([self.values[k] for k in key], allow_list=allow_list)
+            else:
+                raise ValueError(
+                    f"Unable to get list of size greater than "
+                    f"Index.max_list_size ({self.max_list_size})."
+                )
+
+        return Index(self.values[key], allow_list=allow_list)
 
     def __repr__(self):
         # Configured to match pandas
@@ -182,6 +197,17 @@ class Index:
         return 1
 
     @property
+    def ndim(self):
+        """
+        Number of dimensions of the underlying data, by definition 1.
+
+        See Also
+        --------
+        MultiIndex.ndim
+        """
+        return 1
+
+    @property
     def inferred_type(self) -> str:
         """
         Return a string of the type inferred from the values.
@@ -197,6 +223,13 @@ class Index:
             elif self.dtype == "<U":
                 return "string"
         return self.values.inferred_type
+
+    @property
+    def names(self):
+        """
+        Return Index or MultiIndex names.
+        """
+        return [self.name]
 
     @property
     def index(self):
@@ -250,18 +283,68 @@ class Index:
 
         return cls.factory(idx) if len(idx) > 1 else cls.factory(idx[0])
 
-    def equals(self, other: Union[Index, pdarray, Strings, Categorical, list]) -> bool:
-        if not isinstance(other, (Index, pdarray, Strings, Categorical, list)):
-            raise TypeError("other must be of type Index, pdarray, Strings, Categorical, list")
+    def equals(self, other: Index) -> bool:
+        """
+        Whether Indexes are the same size, and all entries are equal.
 
-        if isinstance(other, list) and self.size != len(other):
+        Parameters
+        ----------
+        other : object
+            object to compare.
+
+        Returns
+        -------
+        bool
+            True if the Indexes are the same, o.w. False.
+
+        Examples
+        --------
+        >>> import arkouda as ak
+        >>> ak.connect()
+        >>> i = ak.Index([1, 2, 3])
+        >>> i_cpy = ak.Index([1, 2, 3])
+        >>> i.equals(i_cpy)
+        True
+        >>> i2 = ak.Index([1, 2, 4])
+        >>> i.equals(i2)
+        False
+
+        MultiIndex case:
+
+        >>> arrays = [ak.array([1, 1, 2, 2]), ak.array(["red", "blue", "red", "blue"])]
+        >>> m = ak.MultiIndex(arrays, names=["numbers2", "colors2"])
+        >>> m.equals(m)
+        True
+        >>> arrays2 = [ak.array([1, 1, 2, 2]), ak.array(["red", "blue", "red", "green"])]
+        >>> m2 = ak.MultiIndex(arrays2, names=["numbers2", "colors2"])
+        >>> m.equals(m2)
+        False
+        """
+        if self is other:
+            return True
+
+        if not isinstance(other, Index):
+            raise TypeError("other must be of type Index.")
+
+        if type(self) is not type(other):
             return False
-        elif not isinstance(other, list) and self.size != other.size:
+
+        if len(self) != len(other):
             return False
 
         from arkouda.pdarrayclass import all as akall
 
-        return akall(self == other)
+        if isinstance(self, MultiIndex) and isinstance(other, MultiIndex):
+            if self.nlevels != other.nlevels:
+                return False
+
+            for i in range(self.nlevels):
+                if not self.levels[i].equals(other.levels[i]):
+                    return False
+
+            return True
+        else:
+            return akall(self == other)
 
     def memory_usage(self, unit="B"):
         """
@@ -973,7 +1056,7 @@ class MultiIndex(Index):
             raise TypeError("MultiIndex should be an iterable")
         self.levels = levels
         first = True
-        self.names = names
+        self._names = names
         self.name = name
         for col in self.levels:
             # col can be a python int which doesn't have a size attribute
@@ -1013,6 +1096,13 @@ class MultiIndex(Index):
         return retval
 
     @property
+    def names(self):
+        """
+        Return Index or MultiIndex names.
+        """
+        return self._names
+
+    @property
     def index(self):
         return self.levels
 
@@ -1027,8 +1117,61 @@ class MultiIndex(Index):
         return len(self.levels)
 
     @property
+    def ndim(self):
+        """
+        Number of dimensions of the underlying data, by definition 1.
+
+        See Also
+        --------
+        Index.ndim
+        """
+        return 1
+
+    @property
     def inferred_type(self) -> str:
         return "mixed"
+
+    def get_level_values(self, level: Union[str, int]):
+        if isinstance(level, str):
+            if self.names is None:
+                raise RuntimeError("Cannot get level values because Index.names is None.")
+            elif level not in self.names:
+                raise ValueError(
+                    f'Cannot get level values because level "{level}" is not in Index.names.'
+                )
+            elif isinstance(self.names, list) and level in self.names:
+                level = self.names.index(level)
+
+        if isinstance(level, int) and abs(level) < self.nlevels:
+            name = None
+            if isinstance(self.names, list) and level in self.names:
+                name = self.names[level]
+            return Index(self.levels[level], name=name)
+        else:
+            raise ValueError(
+                "Cannot get level values because level must be a string in names or "
+                "an integer with absolute value less than the number of levels."
+            )
+
+    @property
+    def dtype(self) -> npdtype:
+        """
+        Return the dtype object of the underlying data.
+        """
+        return npdtype("O")
+
+    def equal_levels(self, other: MultiIndex) -> builtins.bool:
+        """
+        Return True if the levels of both MultiIndex objects are the same
+
+        """
+        if self.nlevels != other.nlevels:
+            return False
+
+        for i in range(self.nlevels):
+            if not self.levels[i].equals(other.levels[i]):
+                return False
+        return True
 
     def memory_usage(self, unit="B"):
         """

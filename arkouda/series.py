@@ -3,9 +3,9 @@ from __future__ import annotations
 import json
 from typing import List, Optional, Tuple, Union
 
-import numpy as np  # type: ignore
-import pandas as pd  # type: ignore
-from pandas._config import get_option  # type: ignore
+import numpy as np
+import pandas as pd
+from pandas._config import get_option
 from typeguard import typechecked
 
 import arkouda.dataframe
@@ -160,8 +160,8 @@ class Series:
 
         if self.index.size != self.values.size:
             raise ValueError(
-                "Index size does not match data size: {} != {}".format(
-                    self.index.size, self.values.size))
+                "Index size does not match data size: {} != {}".format(self.index.size, self.values.size)
+            )
         self.name = name
         self.size = self.index.size
 
@@ -233,7 +233,7 @@ class Series:
             # @TODO align the series indexes
             return self.validate_key(key.values)
 
-        if is_supported_scalar(key):  # type: ignore
+        if is_supported_scalar(key):
             if dtype(type(key)) != self.index.dtype:
                 raise TypeError(
                     "Unexpected key type. Received {} but expected {}. key: {}".format(
@@ -334,7 +334,7 @@ class Series:
         """
         if isinstance(val, list):
             val = array(val)
-        if is_supported_scalar(val):  # type: ignore
+        if is_supported_scalar(val):
             if dtype(type(val)) != self.values.dtype:
                 raise TypeError(
                     "Unexpected value type. Received {} but expected {}".format(
@@ -382,10 +382,10 @@ class Series:
             raise ValueError("Cannot set with multiple keys for Series with repeated labels.")
 
         indices = None
-        if is_supported_scalar(key):  # type: ignore
+        if is_supported_scalar(key):
             indices = self.index == key
         else:
-            indices = in1d(self.index.values, key)  # type: ignore
+            indices = in1d(self.index.values, key)
         tf, counts = GroupBy(indices).size()
         update_count = counts[1] if len(counts) == 2 else 0
         if update_count == 0:
@@ -396,12 +396,12 @@ class Series:
             self.index = Index.factory(new_index_values)
             self.values = concatenate([self.values, array([val])])
             return
-        if is_supported_scalar(val):  # type: ignore
+        if is_supported_scalar(val):
             self.values[indices] = val
             return
         else:
-            if val.size == 1 and is_supported_scalar(key):  # type: ignore
-                self.values[indices] = val[0]  # type: ignore
+            if val.size == 1 and is_supported_scalar(key):
+                self.values[indices] = val[0]
                 return
             if update_count != val.size:
                 raise ValueError(
@@ -669,7 +669,7 @@ class Series:
         else:
             new_index = Index(self.index[idx])
 
-        return Series(index=new_index, data=self.values[idx])  # type: ignore [call-overload]
+        return Series(index=new_index, data=self.values[idx])
 
     @typechecked
     def sort_index(self, ascending: bool = True) -> Series:
@@ -738,12 +738,15 @@ class Series:
 
         idx = self.index.to_pandas()
         val = convert_if_categorical(self.values)
+        # pandas errors when ndarray formatted like a segarray is
+        # passed into Series but works when it's just a list of lists
+        vals_on_client = val.to_list() if isinstance(val, SegArray) else val.to_ndarray()
 
         if isinstance(self.name, str):
             name = copy.copy(self.name)
-            return pd.Series(val.to_ndarray(), index=idx, name=name)
+            return pd.Series(vals_on_client, index=idx, name=name)
         else:
-            return pd.Series(val.to_ndarray(), index=idx)
+            return pd.Series(vals_on_client, index=idx)
 
     def to_markdown(self, mode="wt", index=True, tablefmt="grid", storage_options=None, **kwargs):
         r"""
@@ -1067,11 +1070,11 @@ class Series:
         data = json.loads(repMsg)
         val_comps = data["value"].split("+|+")
         if val_comps[0] == Categorical.objType.upper():
-            values = Categorical.from_return_msg(val_comps[1])  # type: ignore
+            values = Categorical.from_return_msg(val_comps[1])
         elif val_comps[0] == Strings.objType.upper():
             values = Strings.from_return_msg(val_comps[1])  # type: ignore
         else:
-            values = create_pdarray(val_comps[1])  # type: ignore
+            values = create_pdarray(val_comps[1])
 
         index = Index.from_return_msg(data["index"])
 
@@ -1096,7 +1099,7 @@ class Series:
         axis: int = 0,
         index_labels: Union[List[str], None] = None,
         value_labels: Union[List[str], None] = None,
-        ordered=False
+        ordered=False,
     ) -> Union[arkouda.dataframe.DataFrame, Series]:
         """Concatenate in arkouda a list of arkouda Series or grouped arkouda arrays horizontally or
         vertically. If a list of grouped arkouda arrays is passed they are converted to a series. Each
@@ -1245,7 +1248,7 @@ class Series:
         from arkouda import Series
         from arkouda.util import map
 
-        return Series(map(self.values, arg), index=self.index)  # type: ignore [call-overload]
+        return Series(map(self.values, arg), index=self.index)
 
     def isna(self) -> Series:
         """
@@ -1653,7 +1656,7 @@ class _iLocIndexer:
 
     def __getitem__(self, key):
         key = self.validate_key(key)
-        if is_supported_scalar(key):  # type: ignore
+        if is_supported_scalar(key):
             key = array([key])
         return Series(index=self.series.index[key], data=self.series.values[key])
 
@@ -1661,11 +1664,11 @@ class _iLocIndexer:
         key = self.validate_key(key)
         val = self.validate_val(val)
 
-        if is_supported_scalar(val):  # type: ignore
+        if is_supported_scalar(val):
             self.series.values[key] = val
             return
         else:
-            if is_supported_scalar(key):  # type: ignore
+            if is_supported_scalar(key):
                 self.series.values[key] = val
                 return
             if key.dtype == int64 and len(val) != len(key):
